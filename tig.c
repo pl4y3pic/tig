@@ -507,6 +507,7 @@ static const char **opt_diff_argv	= NULL;
 static const char **opt_rev_argv	= NULL;
 static const char **opt_file_argv	= NULL;
 static const char **opt_blame_argv	= NULL;
+static const char *opt_diff_views	= "diff,stage"; /* diff-like views */
 static int opt_lineno			= 0;
 static bool opt_show_id			= FALSE;
 static int opt_id_cols			= ID_WIDTH;
@@ -1500,6 +1501,11 @@ option_set_command(int argc, const char *argv[])
 	if (strcmp(argv[1], "="))
 		return ERROR_NO_VALUE_ASSIGNED;
 
+	if (!strcmp(argv[0], "diff-views")) {
+		opt_diff_views = argv[2];
+		return SUCCESS;
+	}
+
 	if (!strcmp(argv[0], "blame-options"))
 		return parse_args(&opt_blame_argv, argv + 2);
 
@@ -1951,6 +1957,7 @@ struct view {
 	unsigned long col;	/* Column when drawing. */
 	bool has_scrolled;	/* View was scrolled. */
 	bool force_redraw;	/* Whether to force a redraw after reading. */
+	size_t prefix_size;	/* Tab-expanded size of prefix chars. */
 
 	/* Loading */
 	const char **argv;	/* Shell command arguments. */
@@ -2133,7 +2140,7 @@ draw_text_expanded(struct view *view, enum line_type type, const char *string, i
 	static char text[SIZEOF_STR];
 
 	do {
-		size_t pos = string_expand(text, sizeof(text), string, opt_tab_size);
+		size_t pos = string_expand(text, sizeof(text), string, opt_tab_size, view->prefix_size);
 
 		if (draw_chars(view, type, text, max_len, use_tilde))
 			return TRUE;
@@ -4437,7 +4444,7 @@ pager_wrap_line(struct view *view, const char *data, enum line_type type)
 
 	while (datalen > 0 || !has_first_line) {
 		bool wrapped = !!first_line;
-		size_t linelen = string_expanded_length(data, datalen, opt_tab_size, view->width - !!wrapped);
+		size_t linelen = string_expanded_length(data, datalen, opt_tab_size, view->width - !!wrapped, view->prefix_size);
 		struct line *line;
 		char *text;
 
@@ -6544,7 +6551,7 @@ branch_read(struct view *view, char *line)
 		}
 
 		if (title)
-			string_expand(branch->title, sizeof(branch->title), title, 1);
+			string_expand(branch->title, sizeof(branch->title), title, 1, 0);
 
 		view->line[i].dirty = TRUE;
 	}
@@ -7955,7 +7962,7 @@ main_add_commit(struct view *view, enum line_type type, struct commit *template,
 
 	/* FIXME: More graceful handling of titles; append "..." to
 	 * shortened titles, etc. */
-	string_expand(buf, sizeof(buf), title, 1);
+	string_expand(buf, sizeof(buf), title, 1, 0);
 	title = buf;
 	titlelen = strlen(title);
 
@@ -9327,6 +9334,11 @@ main(int argc, const char *argv[])
 
 	if (load_git_config() == ERR)
 		die("Failed to load repo config.");
+
+	foreach_view(view, i) {
+		if (strstr(opt_diff_views, view->name) != NULL)
+			view->prefix_size = 1;
+	}
 
 	/* Require a git repository unless when running in pager mode. */
 	if (!opt_git_dir[0] && request != REQ_VIEW_PAGER)

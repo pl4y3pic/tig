@@ -291,14 +291,16 @@ string_copy_rev_from_commit_line(char *dst, const char *src)
 #define string_add(dst, from, src) \
 	string_ncopy_do(dst + (from), sizeof(dst) - (from), src, sizeof(src))
 
+#define SIZE	((size < prefix_size) ? size : (size - prefix_size))
+
 static inline size_t
-string_expanded_length(const char *src, size_t srclen, size_t tabsize, size_t max_size)
+string_expanded_length(const char *src, size_t srclen, size_t tabsize, size_t max_size, size_t prefix_size)
 {
 	size_t size, pos;
 
 	for (size = pos = 0; pos < srclen && size < max_size; pos++) {
 		if (src[pos] == '\t') {
-			size_t expanded = tabsize - (size % tabsize);
+			size_t expanded = tabsize - (SIZE % tabsize);
 
 			size += expanded;
 		} else {
@@ -310,13 +312,13 @@ string_expanded_length(const char *src, size_t srclen, size_t tabsize, size_t ma
 }
 
 static inline size_t
-string_expand(char *dst, size_t dstlen, const char *src, int tabsize)
+string_expand(char *dst, size_t dstlen, const char *src, int tabsize, size_t prefix_size)
 {
 	size_t size, pos;
 
 	for (size = pos = 0; size < dstlen - 1 && src[pos]; pos++) {
 		if (src[pos] == '\t') {
-			size_t expanded = tabsize - (size % tabsize);
+			size_t expanded = tabsize - (SIZE % tabsize);
 
 			if (expanded + size >= dstlen - 1)
 				expanded = dstlen - size - 1;
